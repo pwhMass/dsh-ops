@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { PACKAGE_ROOT, assert, report, test, withTempDir } from './lib/harness.mjs'
 import { NIUBASH_PACKAGE_PATH } from '../lib/cli/niubash-payload.js'
+import { stageFixtureNiubash } from './lib/niubash-distribution-fixture.mjs'
 import { PLATFORMS, workerName } from '../lib/ptc/runtime.js'
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 function header(target) {
@@ -36,8 +37,8 @@ function fixture(root, targets = PLATFORMS) {
     for(const name of ['security.h','opsipc.cpp','opsnt.cpp']) { fs.writeFileSync(path.join(source,name),name); receipt.sources[name]=hash(name) }
     fs.writeFileSync(path.join(ipc,'provenance.json'),JSON.stringify(receipt))
   }
-  // Share the immutable real frozen fixture across synthetic worker headers; never fake its hash.
-  if (targets.includes('win32-x64')) fs.cpSync(path.join(PACKAGE_ROOT, NIUBASH_PACKAGE_PATH), path.join(root, NIUBASH_PACKAGE_PATH), { recursive: true })
+  // Accept the same verified archive override as other release suites; never fake its hash.
+  if (targets.includes('win32-x64')) stageFixtureNiubash(path.join(root, NIUBASH_PACKAGE_PATH))
   for (const relative of ['cli/niubash-payload.js', 'cli/niubash-payload-manifest.json', 'niubash/faces.js',
     'niubash/seal.js']) {
     const target = path.join(root, 'lib', relative)
