@@ -29,7 +29,7 @@ Earlier candidates exposed startup-scheduling regressions. They were corrected, 
 
 Logs (local, outside Git): `/mnt/e/Models/workspace-cache/myself/tmp/dsh-ops-test-20261117/final-reviewed.log` and `baseline-aligned.log`. Downloaded archive and npm cache are in the same E-drive test root.
 
-The fix is retained on local branch `fix/942-active-tools-scope`. The only remote points at the upstream owner's repository; no push is attempted without an existing writable owner fork. No remote, issue or PR was created. Rust compilation, live Web-profile installation and LLM token savings are still unverified.
+The fix is retained on branch `fix/942-active-tools-scope` (implementation commit `8dcb1cc`). On 2026-11-17 the user authorized creating a GitHub fork with `gh`. The authenticated account `pwhMass` owns the verified writable fork `https://github.com/pwhMass/dsh-ops`, whose parent is `T-Auto/dsh-ops`. Local remotes use `origin` for the owner fork and `upstream` for the original project. The fix branch is the push target; no issue, comment or pull request is published by this operation. Rust compilation, live Web-profile installation and LLM token savings are still unverified.
 
 Next: review the candidate with upstream maintainers, validate with a locally built worker/full release payload, then consider installation into a disposable DSH profile before changing the daily Web profile.
 
