@@ -56,63 +56,11 @@ fn update_lock(name: &str) -> bool {
     digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
-/// `.<target>.dsh-ops-<uuid>`, the sibling `atomic_write` stages before rename.
-///
-/// `ops-files/src/file.rs` writes the replacement bytes here, restores mode,
-/// owner and ACLs on it, syncs, and only then renames it over the target. Until
-/// that rename the file holds content the caller has not committed — and it is
-/// dropped under a dot name, which is why the old blanket rule used to hide it
-/// and why `includeHidden` must not start exposing it. `sweep_debris` clears
-/// leftovers of a killed writer on its own schedule; that is not a caller's
-/// business either.
-///
-/// The suffix must parse as a v4 UUID, the same test `sweep_debris` applies, so
-/// an operator file such as `.notes.txt.dsh-ops-personal-backup` stays theirs.
+/// Both fixed-size hashed siblings and exact legacy siblings carry unpublished
+/// content. Share publication's complete-shape matcher so `includeHidden` can
+/// never expose them and near-miss operator backups remain caller content.
 fn atomic_temporary(name: &str) -> bool {
-    let Some(dot) = name.strip_prefix('.') else {
-        return false;
-    };
-    let Some(at) = dot.rfind(".dsh-ops-") else {
-        return false;
-    };
-    if at == 0 {
-        return false;
-    }
-    v4_uuid(&dot[at + ".dsh-ops-".len()..])
-}
-
-/// Whether `value` is a hyphenated v4 UUID, the tail `atomic_write` generates.
-///
-/// Spelled out rather than parsed with `uuid`: that crate is a dev-dependency
-/// here, and the shape is fixed. A v4 UUID is 36 characters of `8-4-4-4-12`
-/// lowercase hex with a `4` version nibble and an RFC 4122 variant nibble.
-fn v4_uuid(value: &str) -> bool {
-    const GROUPS: [usize; 5] = [8, 4, 4, 4, 12];
-    let mut rest = value;
-    for (index, width) in GROUPS.into_iter().enumerate() {
-        if index > 0 {
-            match rest.strip_prefix('-') {
-                Some(tail) => rest = tail,
-                None => return false,
-            }
-        }
-        if rest.len() < width {
-            return false;
-        }
-        let (group, tail) = rest.split_at(width);
-        if !group.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-            return false;
-        }
-        match index {
-            // Version nibble: `atomic_write` calls `Uuid::new_v4`.
-            2 if group.as_bytes()[0] != b'4' => return false,
-            // RFC 4122 variant: the top two bits are `10`.
-            3 if !matches!(group.as_bytes()[0], b'8' | b'9' | b'a' | b'b') => return false,
-            _ => {}
-        }
-        rest = tail;
-    }
-    rest.is_empty()
+    ops_files::atomic_staging::is_temporary(name)
 }
 
 /// Every exclusion the walk applies that is not a caller-selectable dot path.

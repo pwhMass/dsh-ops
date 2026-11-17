@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 use ops_protocol as contract;
+pub mod atomic_staging;
 pub mod cache_io;
 mod file;
 pub mod file_path;

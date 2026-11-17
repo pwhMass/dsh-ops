@@ -209,7 +209,7 @@ await test('a basename at the POSIX 255-byte limit is readable; a longer one is 
     const refused = envelopeOf(await callTool('inspect_local_file', { path: at(tooLong) }, { root: workspace }), assert)
     assert.equal(refused.status, 'error', `created=${created} ${JSON.stringify(refused)}`)
     assert.equal(refused.error.code, 'IO_ERROR')
-    assert.match(refused.error.message, /File name too long/)
+    assert.match(refused.error.message, /file ?name too long/i)
   })
 })
 

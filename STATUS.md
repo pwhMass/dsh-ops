@@ -2,7 +2,20 @@
 
 Updated: 2026-11-17 (Asia/Shanghai).
 
-## Scope
+## Current maintenance — 2026-11-17
+
+The active independent checkout is now `repos/upstream/dsh-ops`, registered in the workspace repository/project catalogues. The earlier scratch checkout and baseline are retained only as historical evidence, not command dependencies or active editing sources. Continue on `fix/942-active-tools-scope`, pushing reviewed batches only to `pwhMass/dsh-ops`.
+
+The user requested continuing maintenance. No periodic schedule, upstream PR/comment or daily-profile deployment is authorized by this maintenance process.
+
+- Corrected an earlier environment assumption: Rust/Cargo **is installed**, but absent from this shell's PATH. Reused installed Rust **1.98.1**, explicitly overriding the repository's **1.97.1** CI pin; no toolchain was installed or changed.
+- Built the unmodified current-source Linux worker with `--release --locked`, staged it through `bin/native-runtime.mjs`, and recorded SHA-256 `2fc555b15c638fa102be81edbc000c7186bc4f2eacad68786c24f0cf5ee72a25`. Cargo downloads/build target/logs are on E drive.
+- With this source-matched worker, `permissions`, `linux-paths`, `host-scope`, and the initial #939 reproduction suites all passed. Earlier permissions/long-path failures must not be treated as confirmed source defects. The long-path error text also varies between Rust builds (`Filename` versus `File name`).
+- Fixed a separately confirmed mutation defect: including the complete target basename in atomic staging added 46 bytes, so valid 210–255-byte targets failed writes. New staging names are fixed 114-byte ASCII; cleanup and search share exact new/legacy classifiers. Twelve long-basename mutation/isolation/cleanup checks failed against the pre-fix binary where relevant and now pass against the rebuilt worker. The complete Rust workspace passed **656 tests**, zero failed/ignored; build and staging passed. A targeted combined regression run also passed. The rebuilt worker SHA-256 is `3a761cfcff275cc3fc353c8505cc3a5afa86ba50619c95ca7c051d6db6730cd9`.
+- #939 candidate: ordinary source lines are literal/copyable; physically unsafe lines carry a `j` line-label marker and a complete JSON string. Canonical/PTC data and literal edit semantics are unchanged. This is an intentional Native presentation contract change, not a transparent patch.
+- New regressions were run against pre-rebuild artifacts and failed as expected. Final worker/render rebuild, regression counts and commits are pending; do not use this in production yet.
+
+## First evaluation scope (historical)
 
 Local evaluation and bug-fix candidate against upstream `58f6e2817618fae52476e8c7f1920aaeb4421c7a` (package version 0.5.5). The running DSH Web profile was not modified, installed into, or restarted. No upstream issue, comment or pull request was published.
 

@@ -597,8 +597,8 @@ pub fn lock_and_read_for_update(file: &Path) -> Result<(UpdateLock, Vec<u8>)> {
     let bytes = read_bytes(file)?;
     Ok((lock, bytes))
 }
-/// Remove `.<name>.dsh-ops-<uuid>` leftovers from earlier writers that were killed
-/// before they could publish.
+/// Remove this target's hashed staging leftovers and exact legacy
+/// `.<name>.dsh-ops-<uuid>` leftovers from writers killed before publication.
 ///
 /// A `SIGKILL` cannot run a cleanup path, so the debris cannot be prevented at the
 /// point it is created. The next writer of the same file is the only place it can
@@ -614,14 +614,18 @@ pub fn lock_and_read_for_update(file: &Path) -> Result<(UpdateLock, Vec<u8>)> {
 /// lock on that other file and not on this one. Reported by @Haoming9527 in review
 /// of #81.
 fn sweep_debris(parent: &cap_std::fs::Dir, name: &str) {
-    let prefix = format!(".{name}.dsh-ops-");
+    let prefixes = [
+        crate::atomic_staging::prefix(name),
+        format!(".{name}.dsh-ops-"),
+    ];
     if let Ok(entries) = parent.entries() {
         for entry in entries.flatten() {
             if let Ok(leftover) = entry.file_name().into_string() {
-                let own = leftover
-                    .strip_prefix(&prefix)
-                    .and_then(|tail| uuid::Uuid::parse_str(tail).ok())
-                    .is_some_and(|parsed| parsed.get_version_num() == 4);
+                let own = prefixes.iter().any(|prefix| {
+                    leftover
+                        .strip_prefix(prefix)
+                        .is_some_and(crate::atomic_staging::v4_uuid)
+                });
                 if own {
                     let _ = parent.remove_file(&leftover);
                 }
@@ -648,7 +652,7 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<Option<(Value, Vec<Stri
     let parent = &checked.parent;
     let name = &checked.name;
     sweep_debris(parent, name);
-    let temporary = format!(".{name}.dsh-ops-{}", uuid::Uuid::new_v4());
+    let temporary = crate::atomic_staging::new_name(name);
     let mut file = publication::create_sibling(parent, &temporary, Some(&checked))?;
     // Keep content private until final metadata is restored. Creation mode also
     // masks inherited ACL grants; never write sensitive bytes to a default 0666 inode.

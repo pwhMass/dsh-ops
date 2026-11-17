@@ -457,7 +457,8 @@ fn publish_new(
     } else {
         None
     };
-    let temporary = format!(".{}.dsh-ops-{}", checked.name, uuid::Uuid::new_v4());
+    sweep_debris(&checked.parent, &checked.name);
+    let temporary = crate::atomic_staging::new_name(&checked.name);
     let mut file = publication::create_sibling(&checked.parent, &temporary, source)?;
     let prepared = (|| -> Result<(FileFacts, Vec<String>)> {
         // Capture timestamps before reading the source for a streamed copy: the

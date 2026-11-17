@@ -7,6 +7,9 @@ this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+- Bound atomic staging names independently of the target basename so legal long POSIX filenames can be created, copied and updated. Cleanup and search share exact current/legacy staging classifiers; update locks, CAS, no-follow traversal and publication semantics are unchanged. See [atomic staging](atomic-staging.md).
+- 原子暂存名不再附加完整目标 basename，合法长 POSIX 文件名可创建、复制与更新；清理和搜索共用精确新旧暂存名分类器，更新锁、CAS、不跟随链接与发布语义不变。见[原子暂存](atomic-staging.zh.md)。
+
 - Resolve scope helpers from the module identity of the active tools service, not merely the global CLI entry. Split launcher/profile installations retain the actual registrar's scope tags and parent chain (#942); service-verified lookups are cached per service, and a context-free lookup cannot poison them.
 - 根据实际 tools 服务的模块身份解析 scope，而不再仅依赖全局 CLI 入口。启动器与 profile 分离安装时保留真实注册器的 scope 标记和父链（#942）；已验证的查找按服务缓存，无上下文查找不会污染它们。
 
