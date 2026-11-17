@@ -64,7 +64,7 @@ export function ownsPublication(ctx: Context, tool: ToolDefinition): boolean {
  * tools/change; transparent takeover of that case is deliberately unsupported.
  */
 export async function acquire(ctx: Context, scope: object | undefined, name: string, canonical: Canonical): Promise<PublicationLease> {
-  const { scopeOf, scopeChainOf } = await loadScopes()
+  const { scopeOf, scopeChainOf } = await loadScopes(ctx)
   ctx.fiber.assertActive()
   if (scopeOf(ctx) !== scope) throw new Error('Publication scope must match its registration context')
   const root = ctx.root ?? ctx

@@ -106,4 +106,35 @@ await test('an installed profile resolves the host copy over a hoisted one (#752
     assert.equal(result.stdout.trim(), 'host-copy')
   }))
 
+for (const launcher of ['valid', 'missing-export', 'throws']) await test(`active tools win over a ${launcher} global launcher (#942)`, () =>
+  withTempDir('host-scope-active-tools', async root => {
+    const installed = path.join(root, 'profiles/web/node_modules/dsh-ops/lib/adapter/dsh/host.js')
+    fs.mkdirSync(path.dirname(installed), { recursive: true })
+    fs.copyFileSync(adapter, installed)
+    for (const [directory, marker] of [['launcher', 'launcher'], ['profiles/web', 'active']]) {
+      scopeCopy(path.join(root, directory), marker)
+      write(root, `${directory}/node_modules/@deepseek-ai/dsh-tools/package.json`, JSON.stringify({
+        name: '@deepseek-ai/dsh-tools', type: 'module', exports: './index.js',
+      }))
+      write(root, `${directory}/node_modules/@deepseek-ai/dsh-tools/index.js`, 'export class ToolsService {}\n')
+    }
+    if (launcher !== 'valid') write(root, 'launcher/node_modules/@deepseek-ai/dsh-tools/index.js',
+      launcher === 'throws' ? 'throw new Error("stale CLI dependency")' : 'export const legacy = true')
+    write(root, 'launcher/entry.mjs', [
+      `import { loadScopes } from ${JSON.stringify(pathToFileURL(installed).href)}`,
+      `import { ToolsService } from ${JSON.stringify(pathToFileURL(path.join(root, 'profiles/web/node_modules/@deepseek-ai/dsh-tools/index.js')).href)}`,
+      'const tools = new ToolsService()',
+      'const ctx = { get: name => name === "tools" ? tools : undefined }',
+      // An earlier unscoped lookup must not poison the service-verified selection.
+      'await loadScopes()',
+      'console.log((await loadScopes(ctx)).copyMarker)',
+    ].join('\n'))
+    const result = spawnSync(process.execPath, [path.join(root, 'launcher/entry.mjs')], {
+      encoding: 'utf8', timeout: 30_000, env: { ...process.env, DSH_HOME: root,
+        DSH_PROFILE_DIR: path.join(root, 'profiles/web') },
+    })
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(result.stdout.trim(), 'active')
+  }))
+
 report('host-scope-source')

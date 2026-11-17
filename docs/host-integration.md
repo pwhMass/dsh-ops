@@ -27,6 +27,12 @@ The shared result adapter preserves PTC's existing `j-` batch audit and legacy `
 
 PTC guidance is filled only after the public text waterfall confirms the executor's `tools:ptc-only` section. Shared callable file names do not establish presentation. Enabling the PTC row must leave the complete Native prompt and wire tool list unchanged, while the PTC assembly keeps its admitted SDK.
 
+## Split launcher and profile module trees (#942)
+
+OPS resolves the active `tools` service against candidate `ToolsService` classes and loads the scope dependency of the matching tools module. The CLI entry and `DSH_PROFILE_DIR` only locate candidates; neither path proves which registrar owns the context. Broken optional candidates are skipped, and an unknown active registrar fails closed. Verified module identities are cached without registering probe tools.
+
+Registrations made before tools is available retain deferred scope readers. A scope identity cannot be read until the tools service is available: OPS reports `Scope identity requires the active tools service` rather than silently turning a scoped contribution into a global one. Ensure tools is mounted before inspecting or comparing those registrations. This does not change session permissions, tool contracts or the default preset.
+
 ## Source ownership
 
 `src/presets/` owns built-in preset defaults. `src/consumer/` assembles built-in and external

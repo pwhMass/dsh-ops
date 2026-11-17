@@ -53,7 +53,7 @@ const runtimes = new WeakMap<Agent, Source>()
  */
 export async function acquireSharedFile(agent: Agent, api: SharedApi, config: NativeRuntimeConfig): Promise<PublicationLease> {
   if (!agent.ctx) throw new Error('Shared file source requires an agent scope')
-  const { scopeChainOf } = await loadScopes()
+  const { scopeChainOf } = await loadScopes(agent.ctx)
   agent.ctx.fiber.assertActive()
   const owner = scopeChainOf(agent).find(scope => runtimes.has(scope as Agent)) as Agent | undefined
   const runtimeOwner = owner ?? agent

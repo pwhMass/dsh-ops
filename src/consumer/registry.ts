@@ -23,11 +23,11 @@ export function onIntegrationsChange(ctx: Context, listener: () => void): () => 
   return () => { state.listeners.delete(listener) }
 }
 export async function joinIntegration(ctx: Context, config: IntegrationConfig) {
-  const { scopeOf, scopeChainOf } = await loadScopes()
+  const { scopeOf, scopeChainOf } = await loadScopes(ctx)
   const key = ctx.root ?? ctx
   let state = states.get(key)
   if (!state) { state = { bindings: [], listeners: new Set(), chain: scopeChainOf }; states.set(key, state) }
-  const owner = state, row: Binding = { config, scope: scopeOf(ctx), active: true }
+  const owner = state, row: Binding = { config, get scope() { return scopeOf(ctx) }, active: true }
   if (owner.bindings.some(other => other.active && other.scope === row.scope && other.config.preset === config.preset)) {
     throw new Error(`OPS integration already owns preset ${config.preset} in this scope; dispose the previous instance before reconfiguration`)
   }

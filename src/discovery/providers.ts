@@ -57,7 +57,7 @@ export function onProvidersChange(ctx: Context, listener: () => void): () => voi
 export async function prepareProviders(ctx: Context): Promise<void> {
   const key = ctx.root ?? ctx
   if (roots.has(key)) return
-  const { scopeChainOf } = await loadScopes()
+  const { scopeChainOf } = await loadScopes(ctx)
   if (!roots.has(key)) roots.set(key, { providers: [], listeners: new Set(), sequence: 0, chain: scopeChainOf })
 }
 /** Use the returned disposer (also bound to ctx) for capability updates, unload and reload. */
@@ -69,12 +69,12 @@ export async function registerNativeCapability(ctx: Context, capability: NativeC
   if (capability.discoverable !== undefined && typeof capability.discoverable !== 'function') throw new Error('discoverable must be a side-effect-free function')
   if (capability.disclosure !== undefined && !['resident', 'on-demand'].includes(capability.disclosure)) throw new Error('disclosure must be resident or on-demand')
   await prepareProviders(ctx)
-  const { scopeOf } = await loadScopes(), state = roots.get(ctx.root ?? ctx)!, scope = scopeOf(ctx)
-  if (state.providers.some(row => row.active && row.scope === scope && row.capability.definition.name === definition.name)) throw new Error(`Native capability ${definition.name} already has a provider in this scope`)
+  const { scopeOf } = await loadScopes(ctx), state = roots.get(ctx.root ?? ctx)!
+  if (state.providers.some(row => row.active && row.scope === scopeOf(ctx) && row.capability.definition.name === definition.name)) throw new Error(`Native capability ${definition.name} already has a provider in this scope`)
   // Capture a registration's descriptors; changing a provider requires a new lifetime/token.
   const captured: NativeCapability = { ...capability, definition: { ...definition,
     parameters: structuredClone(definition.parameters), output: { ...definition.output, schema: structuredClone(definition.output.schema) } } }
-  const row: Provider = { token: `external:${++state.sequence}`, scope, capability: captured, active: true, calls: new Set() }
+  const row: Provider = { token: `external:${++state.sequence}`, get scope() { return scopeOf(ctx) }, capability: captured, active: true, calls: new Set() }
   state.providers.push(row)
   const notify = () => { for (const listener of [...state.listeners]) listener() }
   const dispose = () => {

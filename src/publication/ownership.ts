@@ -5,13 +5,13 @@ interface State { rows: Row[]; agents: Set<Agent>; publishing: number; sequence:
 const roots = new WeakMap<object, Map<string, State>>()
 /** The nearest plugin row owns the SDK; overlapping rows never double-register one layer. */
 export async function ownScopes(ctx: Context, family: string, changed: () => void, allows: (agent: Agent) => boolean = () => true) {
-  const { scopeOf, scopeChainOf } = await loadScopes()
+  const { scopeOf, scopeChainOf } = await loadScopes(ctx)
   const key = ctx.root ?? ctx
   let families = roots.get(key)
   if (!families) { families = new Map(); roots.set(key, families) }
   let state = families.get(family)
   if (!state) { state = { rows: [], agents: new Set(), publishing: 0, sequence: 0 }; families.set(family, state) }
-  const shared = state, row: Row = { scope: scopeOf(ctx), changed, allows }
+  const shared = state, row: Row = { get scope() { return scopeOf(ctx) }, changed, allows }
   shared.rows.push(row)
   const ordinal = ++shared.sequence
   const notify = () => {

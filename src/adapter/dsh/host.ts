@@ -102,19 +102,84 @@ export function chooseScopeSource(bare: string | undefined, host: string | undef
   return sameModule(bare, host) ? bare : host
 }
 
-/** Chosen once: the running host's module tree does not change inside one process. */
-let scopeSource: string | undefined
-
-/** Load the scope helpers from the copy the running host uses, not a second copy. */
-export async function loadScopes(): Promise<Scopes> {
-  if (scopeSource === undefined) {
-    let bare: string | undefined
-    try { bare = import.meta.resolve('@deepseek-ai/dsh-scope') } catch { bare = undefined }
-    const source = chooseScopeSource(bare, hostScopesUrl(), profileScopesUrl())
-    if (source === undefined) throw new Error('The host provides no @deepseek-ai/dsh-scope to load')
-    scopeSource = source
+/** A launcher path is discovery evidence, not proof of the active registrar's identity. */
+function toolsSources(): string[] {
+  const anchors = [import.meta.url, hostEntryAnchor(),
+    process.env.DSH_PROFILE_DIR && path.join(process.env.DSH_PROFILE_DIR, 'package.json'),
+    path.join(profileLayer(), 'package.json')]
+  const sources = new Set<string>()
+  for (const anchor of anchors) {
+    if (!anchor) continue
+    try { sources.add(pathToFileURL(createRequire(anchor).resolve('@deepseek-ai/dsh-tools')).href) } catch { /* Optional candidate. */ }
   }
-  return import(scopeSource) as Promise<Scopes>
+  return [...sources]
+}
+
+// Cache only a verified service identity, never an earlier context-free lookup.
+const serviceScopes = new WeakMap<object, Scopes>()
+const knownServices = new Map<typeof import('@deepseek-ai/dsh-tools').ToolsService, Scopes>()
+const scopeUrls = new WeakMap<Scopes, string>()
+const admittedScopes = (scopes: Scopes): Promise<Scopes> => import(scopeUrls.get(scopes)!) as Promise<Scopes>
+
+/** Load the scope dependency of the actual tools service, including split CLI/profile trees. */
+export async function loadScopes(ctx?: Pick<Context, 'get'>): Promise<Scopes> {
+  const tools = ctx && service<object>(ctx, 'tools')
+  const cached = tools && serviceScopes.get(tools)
+  if (cached) return admittedScopes(cached)
+  if (tools) for (const [constructor, scopes] of knownServices) {
+    if (tools instanceof constructor) { serviceScopes.set(tools, scopes); return admittedScopes(scopes) }
+  }
+  const candidates: { matches(tools: object): boolean; scopes: Scopes }[] = []
+  if (ctx) for (const source of toolsSources()) {
+    try {
+      const candidate = await import(source) as typeof import('@deepseek-ai/dsh-tools')
+      if (typeof candidate.ToolsService !== 'function' || !candidate.ToolsService.prototype) continue
+      const scopeUrl = pathToFileURL(createRequire(source).resolve('@deepseek-ai/dsh-scope')).href
+      const scopes = await import(scopeUrl) as Scopes
+      scopeUrls.set(scopes, scopeUrl)
+      // Cordis Service's instanceof contract recognises its contextual proxies.
+      // scopeOf(ctx) alone is not evidence: a second scope copy can tag it too.
+      if (tools instanceof candidate.ToolsService) {
+        knownServices.set(candidate.ToolsService, scopes)
+        serviceScopes.set(tools, scopes)
+        return scopes
+      }
+      candidates.push({ matches: value => {
+        try { return value instanceof candidate.ToolsService } catch { return false }
+      }, scopes })
+    } catch { /* A stale optional module tree must not hide a working candidate. */ }
+  }
+  const verified = (actual: object): Scopes => {
+    const cached = serviceScopes.get(actual)
+    if (cached) return cached
+    const found = candidates.find(candidate => candidate.matches(actual))?.scopes
+    if (!found) throw new Error('Cannot resolve @deepseek-ai/dsh-scope for the active tools service')
+    serviceScopes.set(actual, found)
+    return found
+  }
+  if (tools) return verified(tools)
+  // Standalone adapter consumers without a tools service retain the legacy lookup.
+  // Do not cache it: a later service-backed call must verify the registrar anew.
+  let bare: string | undefined
+  try { bare = import.meta.resolve('@deepseek-ai/dsh-scope') } catch { bare = undefined }
+  const source = chooseScopeSource(bare, hostScopesUrl(), profileScopesUrl())
+  if (source === undefined) throw new Error('The host provides no @deepseek-ai/dsh-scope to load')
+  const fallback = await import(source) as Scopes
+  if (!ctx) return fallback
+  // Root registrations may precede tools. Their captured chain functions must
+  // resolve the service when used, rather than freeze the provisional module.
+  return new Proxy(fallback, { get(target, key) {
+    const value = Reflect.get(target, key)
+    if (typeof value !== 'function' || !['scopeOf', 'scopeChainOf', 'scopeParentOf', 'bindScopeParent', 'createScope', 'scopeTarget', 'isScopeCarrier', 'carrierKeyOf'].includes(String(key))) return value
+    return (...args: unknown[]) => {
+      const current = service<object>(ctx, 'tools')
+      if (!current && ['scopeOf', 'createScope', 'bindScopeParent', 'scopeTarget'].includes(String(key))) {
+        throw new Error('Scope identity requires the active tools service')
+      }
+      const scopes = current ? verified(current) : fallback
+      return Reflect.apply(Reflect.get(scopes, key), undefined, args)
+    }
+  } })
 }
 
 export async function loadCarrierHost(anchor: string): Promise<CarrierHost> {

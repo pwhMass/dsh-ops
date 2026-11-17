@@ -25,7 +25,7 @@ export function mountReplacements(root: Context, publication: ReplacementPublica
   root.inject(['tools'], async ctx => {
     const tools = ctx.get('tools')
     if (!tools) return
-    const { scopeChainOf, bindScopeParent } = await loadScopes()
+    const { scopeChainOf, bindScopeParent } = await loadScopes(ctx)
     const sources = new WeakSet<ToolDefinition>()
     const entries = new Map<Agent, Entry>()
     // Disposed agents and agents with unlinked host scopes must not receive shadows.

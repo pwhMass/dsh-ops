@@ -40,7 +40,7 @@ function refresh(owner: State, scope: unknown): void {
   })
 }
 export async function registerNativeProvider(ctx: Context, definitions: ToolDefinition[], register: (tool: ToolDefinition) => (() => void), options: { inheritable?: boolean; priority?: number } = {}): Promise<() => void> {
-  const { scopeOf } = await loadScopes()
+  const { scopeOf } = await loadScopes(ctx)
   const stop = registerNativeProviderAtScope(ctx, scopeOf(ctx), definitions, register, options)
   try { await nativeProviderReady(stop) } catch (error) {
     try { stop() } catch (cleanup) { ctx.logger.warn(`dsh-ops: native provider cleanup failed: ${publicationError(cleanup)}`) }

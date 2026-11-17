@@ -9,6 +9,7 @@ import { DISCOVERABLE_TOOLS } from '../lib/discovery/config.js'
 import { NativeFileTools } from '../lib/file/runtime.js'
 import { BASH_TOOL_NAME } from '../lib/shells/constants.js'
 import { assert, test, report } from './lib/harness.mjs'
+import { bootHost, shutdown } from './lib/host.mjs'
 
 await test('the catalogue covers every owned file, PTC and shell tool exactly once', () => {
   assert.equal(CAPABILITIES.length, 20)
@@ -84,26 +85,26 @@ await test('create-only help names the required literal instead of suggesting an
 })
 
 await test('native registration consumes the catalogue while execute values stay unchanged', async () => {
-  const registered = [], disposed = []
-  const runtime = new NativeFileTools({ ctx: Object.assign(new Context(), { tools: { register(definition) {
-    registered.push(definition); return () => disposed.push(definition.name)
-  } } }), config: { workerPath: 'fixture-worker' } })
-  assert.deepEqual(await runtime.start(), NATIVE_FILE_TOOLS.map(publicToolName))
-  assert.deepEqual(registered.map(item => item.name), NATIVE_FILE_TOOLS.map(publicToolName))
-  const canonical = { status: 'completed', items: [{ path: '/file', line: 1, text: 'text' }], complete: false }
-  for (const [names, definition] of [[FILE_TOOLS, fileDefinition], [PTC_TOOLS, ptcDefinition]]) {
-    for (const name of names) {
-      const tool = definition(name, async () => canonical)
-      const returned = await tool.execute({}, {})
-      if (names === FILE_TOOLS) assert.equal(returned, canonical)
-      else assert.equal(returned.data, canonical)
-      assert.equal(canonical.items[0].path, '/file')
-      if (names === PTC_TOOLS) assert.deepEqual(JSON.parse(tool.output.render({}, canonical)[0].text), canonical)
-      else assert.equal(typeof tool.output.render({}, canonical)[0].text, 'string')
+  const { ctx, tools } = await bootHost()
+  const runtime = new NativeFileTools({ ctx, config: { workerPath: 'fixture-worker' } })
+  try {
+    assert.deepEqual(await runtime.start(), NATIVE_FILE_TOOLS.map(publicToolName))
+    assert.deepEqual(tools.definitions().map(item => item.name), NATIVE_FILE_TOOLS.map(publicToolName))
+    const canonical = { status: 'completed', items: [{ path: '/file', line: 1, text: 'text' }], complete: false }
+    for (const [names, definition] of [[FILE_TOOLS, fileDefinition], [PTC_TOOLS, ptcDefinition]]) {
+      for (const name of names) {
+        const tool = definition(name, async () => canonical)
+        const returned = await tool.execute({}, {})
+        if (names === FILE_TOOLS) assert.equal(returned, canonical)
+        else assert.equal(returned.data, canonical)
+        assert.equal(canonical.items[0].path, '/file')
+        if (names === PTC_TOOLS) assert.deepEqual(JSON.parse(tool.output.render({}, canonical)[0].text), canonical)
+        else assert.equal(typeof tool.output.render({}, canonical)[0].text, 'string')
+      }
     }
-  }
-  await runtime.stop()
-  assert.deepEqual(disposed.sort(), registered.map(item => item.name).sort())
+    await runtime.stop()
+    assert.deepEqual(tools.definitions(), [])
+  } finally { await runtime.stop(); await shutdown(ctx) }
 })
 await test('unstarted Native runtimes return an unavailable value before creating call state', async () => {
   const runtime = new NativeFileTools({ ctx: new Context(), config: { workerPath: 'fixture-worker' } })
