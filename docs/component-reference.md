@@ -66,7 +66,7 @@ When the host provides its `fs` service, `ops_inspect_local_file` reads and real
 
 Read bounded UTF-8 text lines, or a hex view of one path. Directories are rejected — use `ops_glob` or `ops_grep` instead.
 
-Native emits a file header, numbered escaped source lines and revision/continuation notices. PTC retains canonical typed records. Backslashes, controls and Unicode line separators are reversibly escaped; source text cannot forge extra rows. Worker byte limits and long-line continuation remain explicit. See [Native range rendering](native-ranges.md). Rendered bytes are not measured tokens.
+Native emits a file header, numbered source and revision/continuation notices. Ordinary line bodies are literal, including backslashes, and can be copied into literal edits. Only control/separator-containing lines carry a `j` line-label marker with a complete JSON string to decode once; source text cannot forge extra rows. Grep paths are JSON-quoted and declaration metadata stays outside source bodies. PTC keeps the original typed text. Worker byte limits, clipping and long-line continuation remain explicit: incomplete lines must not be guessed complete. See [Native range rendering](native-ranges.md). Rendered bytes are not measured tokens.
 
 | Parameter | Type | Notes |
 | --- | --- | --- |

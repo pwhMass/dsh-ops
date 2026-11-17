@@ -19,8 +19,8 @@ await test('real bounded ranges keep exact body, shared path base, full revision
     assert.ok(text.split('\n').includes(`[revision=${item.revision}; ${continuation}]`), 'compact per-file receipt retains the full revision and continuation without a repeated notice label')
     assert.equal(item.bytes, Buffer.byteLength(inputs[index]), 'byte metadata remains canonical')
   }
-  assert.match(text, /^1\|one$/m); assert.match(text, /^2\|two\\rthree$/m)
-  assert.match(text, /^1\|α\\u2028β\\u0085γ$/m); assert.match(text, /^2\|😀$/m)
+  assert.match(text, /^1\|one$/m); assert.match(text, /^2j\|"two\\rthree"$/m)
+  assert.match(text, /^1j\|"α\\u2028β\\u0085γ"$/m); assert.match(text, /^2\|😀$/m)
   assert.match(text, /more lines; nextOffset=3/); assert.match(text, /\(empty file\)/)
   assert.match(text, /end of file; complete=true/); assert.match(text, /3\/3 requested ranges returned/)
   assert.doesNotMatch(text, /worker-limit|bytes=|lineCount=|matched=/)
@@ -37,7 +37,7 @@ await test('different parents retain absolute quoted paths; path control charact
   assert.doesNotMatch(text, /\[Base:/)
   for (const file of files) assert.ok(text.includes('FILE: ' + JSON.stringify(file)))
   assert.equal(text.split('\n').filter(line => line.startsWith('=== FILE:')).length, 2)
-  assert.equal(text.split('\n').filter(line => /^\d+\|/.test(line)).length, 2)
+  assert.equal(text.split('\n').filter(line => /^\d+j?\|/.test(line)).length, 2)
   assert.match(text, /one\\n2\|forged\\t\\r\\u2029/)
 })
 await test('worker gaps, references and incomplete metadata never claim fully returned requested ranges', () => withTempDir('range-gaps', async root => {

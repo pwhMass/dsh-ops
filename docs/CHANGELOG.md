@@ -7,6 +7,9 @@ this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+- Make ordinary Native source bodies literal/copyable, fixing the backslash read-to-edit mismatch (#939). Physically unsafe lines are explicitly marked `j` and carry a complete JSON string; grep paths are JSON-quoted and declaration metadata remains outside source. Dedup and benchmark decoders understand the marker. Canonical/PTC text, edit arguments, CAS and truncation boundaries are unchanged. This intentionally changes the Native presentation contract; see [Native ranges](native-ranges.md).
+- 普通 Native 源码正文改为原样可复制，修复反斜杠读取后无法直接编辑的问题（#939）；含危险控制/分隔符的行用 `j` 明示完整 JSON 字符串，grep 路径使用 JSON 引号，声明元数据置于正文外。去重与基准解码器同步识别标记；规范/PTC 文本、edit 入参、CAS 和截断边界不变。这是有意的 Native 展示契约变更，见[紧凑文件范围](紧凑文件范围.md)。
+
 - Bound atomic staging names independently of the target basename so legal long POSIX filenames can be created, copied and updated. Cleanup and search share exact current/legacy staging classifiers; update locks, CAS, no-follow traversal and publication semantics are unchanged. See [atomic staging](atomic-staging.md).
 - 原子暂存名不再附加完整目标 basename，合法长 POSIX 文件名可创建、复制与更新；清理和搜索共用精确新旧暂存名分类器，更新锁、CAS、不跟随链接与发布语义不变。见[原子暂存](atomic-staging.zh.md)。
 

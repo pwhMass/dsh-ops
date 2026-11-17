@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer'
 import { publicToolName } from '../../policy.js'
 import { FILE_MUTATIONS } from '../../capabilities/registry.js'
 import { compactRanges } from './ranges.js'
-import { encodeSourceLine } from './line-encoding.js'
+import { encodeSourceLine, sourceLineIsJson, sourceLineNumber, SOURCE_ENCODING_NOTICE } from './line-encoding.js'
 import { renderDocument } from './documents.js'
 import { isDocumentTool } from '../../capabilities/documents.js'
 import { renderResult } from './result-render.js'
@@ -16,8 +16,11 @@ const record = (value: unknown): value is Row => value !== null && typeof value 
 const rows = (value: unknown): Row[] => Array.isArray(value) ? value.filter(record) : []
 const count = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 const label = (value: unknown): string => String(value ?? '').replace(/[\r\n\t\x00-\x1f\x7f]/g, char => JSON.stringify(char).slice(1, -1))
-// Keep physical line labels intact without confusing literal backslashes with escapes.
+// Trusted labels distinguish literal source from complete JSON-encoded control lines.
 const contentLine = (value: unknown): string => encodeSourceLine(String(value ?? ''))
+const encodingNotice = (output: string[], text: string): void => {
+  if (sourceLineIsJson(text) && !output.includes(SOURCE_ENCODING_NOTICE)) output.push(SOURCE_ENCODING_NOTICE)
+}
 const field = (value: unknown): string => typeof value === 'string' ? label(value) : JSON.stringify(value)
 const encodedBytes = (text: string): number => Buffer.byteLength(JSON.stringify([{ type: 'text', text }]), 'utf8')
 
@@ -85,7 +88,11 @@ function inspect(args: Row, value: Row): string[] {
     if (observed) output.push(`[Notice: ${observed}.]`)
     for (const item of group) {
       if (hex) output.push(`${label(item.offset ?? '?')} | ${contentLine(item.text)}`)
-      else output.push(`${count(item.line) ? item.line : '?'} | ${contentLine(item.text)}`)
+      else {
+        const text = String(item.text ?? '')
+        encodingNotice(output, text)
+        output.push(`${sourceLineNumber(count(item.line) ? item.line : '?', text)} | ${contentLine(text)}`)
+      }
     }
     if (!group.length) output.push(value.lineCount === 0 ? '(empty file)' : '(no lines in this range)')
   }
@@ -133,7 +140,9 @@ function diff(args: Row, value: Row): string[] {
   }
   for (const item of rows(value.items)) {
     const sign = item.kind === 'remove' ? '-' : item.kind === 'add' ? '+' : '?'
-    output.push(`${sign} ${label(item.line ?? '?')} | ${contentLine(String(item.text ?? '').replace(/\r?\n$/, ''))}`)
+    const text = String(item.text ?? '').replace(/\r?\n$/, '')
+    encodingNotice(output, text)
+    output.push(`${sign} ${sourceLineNumber(label(item.line ?? '?'), text)} | ${contentLine(text)}`)
   }
   output.push(...notices(value, rows(value.items).length))
   return output
@@ -155,13 +164,20 @@ function listing(tool: string, args: Row, value: Row): string[] {
   for (const item of items) {
     if (typeof item === 'string') { output.push(label(item)); continue }
     if (!record(item)) continue
-    const path = label(item.path ?? '(path unavailable)')
+    // Quote the whole grep path so filenames ending in :12j / [json] cannot forge source markers.
+    const path = tool === 'grep' ? JSON.stringify(String(item.path ?? '(path unavailable)'))
+      .replace(/[\x7f\u0085\u2028\u2029]/g, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`)
+      : label(item.path ?? '(path unavailable)')
     if (tool === 'grep' && typeof item.text === 'string') {
       const numbered = count(item.line) && item.line > 0
       const start = numbered ? Math.max(1, Number(item.line) - (count(args.beforeContext) ? args.beforeContext : 0)) : 0
       if (numbered && start !== item.line) output.push(`[Notice: Match starts at ${path}:${item.line}; context follows.]`)
-      const kind = typeof item.kind === 'string' ? `${item.kind} ` : ''
-      for (const [index, line] of item.text.split('\n').entries()) output.push(`${path}${numbered ? `:${start + index}` : ''} | ${kind}${contentLine(line)}`)
+      const kind = typeof item.kind === 'string' ? ` [${label(item.kind)}]` : ''
+      for (const [index, line] of item.text.split('\n').entries()) {
+        encodingNotice(output, line)
+        const position = numbered ? `:${sourceLineNumber(start + index, line)}` : sourceLineIsJson(line) ? ' [json]' : ''
+        output.push(`${path}${position}${kind} | ${contentLine(line)}`)
+      }
     } else {
       const rest = { ...item }
       delete rest.path
@@ -195,6 +211,8 @@ export function renderNative(tool: string, args: unknown, result: unknown): stri
   else if (tool === 'stat') lines = stat(input, result)
   else if (tool === 'diff') lines = diff(input, result)
   else lines = listing(tool, input, result)
+  // A fallback multi-file renderer may have emitted the same instruction for each file.
+  lines = lines.filter((line, index) => line !== SOURCE_ENCODING_NOTICE || lines.indexOf(SOURCE_ENCODING_NOTICE) === index)
   // Keep the locator ahead of potentially clipped model text so its omitted suffix stays recoverable.
   if (record(result.reference)) lines.unshift('[Stored reference: ' + facts(result.reference, ['refId', 'producerTool', 'totalItems', 'totalBytes'])
     + '; referenceRoot=' + field(result.referenceRoot) + `. Page via ${publicToolName('result')} (discover with query "select:${publicToolName('result')}" if absent); inspect source capture/coverage facts before claiming completeness.]`)

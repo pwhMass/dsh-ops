@@ -58,8 +58,9 @@ await test('authority gates require a successful allowed control and the exact e
 await test('emitted-line verification decodes source instead of accepting colliding escape text', () => {
   const file=path.resolve('escapes.txt'),files=[{path:file,expected:[{line:1,text:'\t'},{line:2,text:'\\t'},{line:3,text:'a"b\\c'}]}]
   const header='=== FILE: '+JSON.stringify(file)+' (Lines 1-3 of 3) ===\n'
-  const valid=header+'1|\\t\n2|\\\\t\n3|a"b\\\\c'
+  const valid=header+'1j|"\\t"\n2|\\t\n3|a"b\\c'
   verifyEmittedReads({committed:[{text:valid}]},files,'candidate')
-  assert.throws(()=>verifyEmittedReads({committed:[{text:valid.replace('2|\\\\t','2|\\t')}]},files,'candidate'),/all emitted/)
+  assert.throws(()=>verifyEmittedReads({committed:[{text:valid.replace('1j|', '1|')}]},files,'candidate'),/all emitted/)
+  assert.throws(()=>verifyEmittedReads({committed:[{text:valid.replace('2|\\t','2j|"\\t"')}]},files,'candidate'),/all emitted/)
 })
 report('bench-integrity')

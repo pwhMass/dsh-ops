@@ -37,7 +37,7 @@ await test('inspect prints one file heading and physical line labels without cha
   assert.ok(view.startsWith(`=== FILE: ${path} (Lines 1-200 of 201) ===`))
   const firstBody = /^1 \| (.*)$/m.exec(view)?.[1]
   assert.equal(typeof firstBody, 'string')
-  assert.equal(JSON.parse('"' + firstBody.replaceAll('"', '\\"') + '"'), value.items[0].text)
+  assert.equal(firstBody, value.items[0].text)
   assert.match(view, /revision=a{64}/)
   assert.match(view, /complete=false/)
   assert.match(view, /nextOffset=201/)
@@ -140,7 +140,7 @@ await test('stat, diff and search retain facts needed for follow-up calls', () =
   assert.match(diff, /before: revision=old/)
   assert.match(diff, /- 2 \| old\n\+ 2 \| new/)
   const grep = render('grep', { complete: false, total: 10, skippedFiles: 2, failed: 1, nextOffset: 2, items: [{ path: '/a', line: 2, text: 'match' }] })
-  assert.match(grep, /\/a:2 \| match/)
+  assert.match(grep, /"\/a":2 \| match/)
   assert.match(grep, /complete=false.*nextOffset=2.*total=10.*skippedFiles=2.*failed=1/)
   assert.match(render('glob', { complete: true, items: [{ path: '/a', bytes: 4, modified: 42 }] }), /\/a: bytes=4; modified=42/)
 })
@@ -151,13 +151,13 @@ await test('glob path mode and grep context preserve actual paths and physical l
   assert.match(glob, /2 items displayed/)
   const value = { complete: true, items: [{ path: '/a', line: 3, text: 'first\nsecond\nmatch\nlast' }] }
   const grep = render('grep', value, { beforeContext: 2, afterContext: 1 })
-  assert.match(grep, /Match starts at \/a:3/)
-  assert.match(grep, /\/a:1 \| first\n\/a:2 \| second\n\/a:3 \| match\n\/a:4 \| last/)
+  assert.match(grep, /Match starts at "\/a":3/)
+  assert.match(grep, /"\/a":1 \| first\n"\/a":2 \| second\n"\/a":3 \| match\n"\/a":4 \| last/)
   const nearStart = render('grep', { items: [{ path: '/a', line: 1, text: 'first\nlast' }] }, { beforeContext: 2 })
-  assert.match(nearStart, /\/a:1 \| first\n\/a:2 \| last/)
+  assert.match(nearStart, /"\/a":1 \| first\n"\/a":2 \| last/)
   const unnumbered = render('grep', { items: [{ path: '/a', line: 0, text: 'first\nmatch' }] }, { beforeContext: 2 })
-  assert.match(unnumbered, /\/a \| first\n\/a \| match/)
-  assert.doesNotMatch(unnumbered, /\/a:\d/)
+  assert.match(unnumbered, /"\/a" \| first\n"\/a" \| match/)
+  assert.doesNotMatch(unnumbered, /"\/a":\d/)
 })
 
 await test('even oversized error text cannot hide effect and retry advice', () => {
@@ -174,7 +174,7 @@ await test('paths cannot inject false headings or notices through control charac
 
 await test('control separators in source text cannot break a numbered physical line', () => {
   const text = render('inspect_local_file', { complete: true, items: [{ path: '/a', line: 1, text: 'left\rright\t\u0085\u2028\u2029\0' }] })
-  assert.ok(text.includes('1 | left\\rright\\t\\u0085\\u2028\\u2029\\u0000'))
+  assert.ok(text.includes('1j | "left\\rright\\t\\u0085\\u2028\\u2029\\u0000"'))
   assert.doesNotMatch(text, /[\r\t\u0085\u2028\u2029\0]/)
 })
 

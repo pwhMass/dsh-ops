@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { encodeSourceLine } from './line-encoding.js'
+import { encodeSourceLine, sourceLineIsJson, sourceLineNumber, SOURCE_ENCODING_NOTICE } from './line-encoding.js'
 type Row = Record<string, unknown>
 const record = (value: unknown): value is Row => value !== null && typeof value === 'object' && !Array.isArray(value)
 const integer = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
@@ -42,7 +42,10 @@ export function compactRanges(input: Row, value: Row): string[] | undefined {
   for (const item of observed) {
     const span = item.lines.length ? `${item.lines[0]!.line}-${item.lines.at(-1)!.line}` : 'none'
     output.push(`=== FILE: ${quoted(base ? path.basename(item.path) : item.path)} (Lines ${span} of ${item.total}) ===`)
-    for (const line of item.lines) output.push(`${line.line}|${encodeSourceLine(line.text)}`)
+    for (const line of item.lines) {
+      if (sourceLineIsJson(line.text) && !output.includes(SOURCE_ENCODING_NOTICE)) output.push(SOURCE_ENCODING_NOTICE)
+      output.push(`${sourceLineNumber(line.line, line.text)}|${encodeSourceLine(line.text)}`)
+    }
     if (!item.lines.length) output.push(item.total === 0 ? '(empty file)' : '(no lines in this range)')
     output.push(`[revision=${item.revision}; ${item.complete ? 'end of file; complete=true' : `more lines; nextOffset=${item.next}`}]`)
   }
